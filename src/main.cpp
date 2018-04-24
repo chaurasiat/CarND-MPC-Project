@@ -126,7 +126,7 @@ int main() {
           // Because x = 0 in the vehicle coordinates, the higher orders are zero
           // Leaves only coeffs[1]
           double epsi = -atan(coeffs[1]);
-          onst double Lf = 2.67;
+          const double Lf = 2.67;
           
           // Latency for predicting time at actuation
           const double dt = 0.1;
@@ -135,10 +135,10 @@ int main() {
           // x, y and psi are all zero after transformation above
           double latent_px = 0.0 + v * dt; // Since psi is zero, cos(0) = 1, can leave out
           const double latent_py = 0.0; // Since sin(0) = 0, y stays as 0 (y + v * 0 * dt)
-          double latent_psi = 0.0 + v * -delta / Lf * dt;
-          double latent_v = v + a * dt;
+          double latent_psi = 0.0 + v * -steering_angle / Lf * dt;
+          double latent_v = v + throttle * dt;
           double latent_cte = cte + v * sin(epsi) * dt;
-          double latent_epsi = epsi + v * -delta / Lf * dt;
+          double latent_epsi = epsi + v * -steering_angle / Lf * dt;
           // Feed in the predicted state values
           Eigen::VectorXd predicted_state(6);
           predicted_state << latent_px, latent_py, latent_psi, latent_v, latent_cte, latent_epsi;
