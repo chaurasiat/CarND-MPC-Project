@@ -126,6 +126,7 @@ int main() {
           // Because x = 0 in the vehicle coordinates, the higher orders are zero
           // Leaves only coeffs[1]
           double epsi = -atan(coeffs[1]);
+          
           const double Lf = 2.67;
           
           // Latency for predicting time at actuation
