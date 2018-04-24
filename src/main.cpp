@@ -91,6 +91,9 @@ int main() {
           double py = j[1]["y"];
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
+          double steering_angle = j[1]["steering_angle"];
+          double throttle = j[1]["throttle"];
+
 
           /*
           * TODO: Calculate steering angle and throttle using MPC.
@@ -98,8 +101,53 @@ int main() {
           * Both are in between [-1, 1].
           *
           */
-          double steer_value;
-          double throttle_value;
+
+          // Need Eigen vectors for polyfit
+          Eigen::VectorXd ptsx_shift(ptsx.size());
+          Eigen::VectorXd ptsy_shift(ptsy.size());
+
+          // Changing the coordinate system  to the vehicle's orientation
+          for (int i = 0; i < ptsx.size(); i++) {
+            double shift_x = ptsx[i] - px;
+            double shift_y = ptsy[i] - py;
+            ptsx_shift[i] = shift_x * cos(-psi) - shift_y * sin(-psi);
+            ptsy_shift[i] = shift_y * cos(-psi) + shift_x * sin(-psi);
+          }
+          // Fits a 3rd-order polynomial to the above x and y coordinates
+          auto coeffs = polyfit(ptsx_shift, ptsy_shift, 3);
+
+          // Calculates the cross track error, since  points were transformed to vehicle coordinates, x & y equal to 0 below.
+          // 'y' would otherwise be subtracted from the polyeval value
+          double cte = polyeval(coeffs, 0);
+
+
+          // Calculate the orientation error
+          // Derivative of the polyfit goes in atan() below
+          // Because x = 0 in the vehicle coordinates, the higher orders are zero
+          // Leaves only coeffs[1]
+          double epsi = -atan(coeffs[1]);
+          onst double Lf = 2.67;
+          
+          // Latency for predicting time at actuation
+          const double dt = 0.1;
+          
+          // Predict state after latency
+          // x, y and psi are all zero after transformation above
+          double latent_px = 0.0 + v * dt; // Since psi is zero, cos(0) = 1, can leave out
+          const double latent_py = 0.0; // Since sin(0) = 0, y stays as 0 (y + v * 0 * dt)
+          double latent_psi = 0.0 + v * -delta / Lf * dt;
+          double latent_v = v + a * dt;
+          double latent_cte = cte + v * sin(epsi) * dt;
+          double latent_epsi = epsi + v * -delta / Lf * dt;
+          // Feed in the predicted state values
+          Eigen::VectorXd predicted_state(6);
+          predicted_state << latent_px, latent_py, latent_psi, latent_v, latent_cte, latent_epsi;
+
+          // Solve for new actuations (and to show predicted x and y in the future)
+          auto vars = mpc.Solve(predicted_state, coeffs);
+
+          double steer_value=vars[0] / (deg2rad(25) * Lf);
+          double throttle_value=vars[1];
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
@@ -108,11 +156,16 @@ int main() {
           msgJson["throttle"] = throttle_value;
 
           //Display the MPC predicted trajectory 
-          vector<double> mpc_x_vals;
-          vector<double> mpc_y_vals;
+          vector<double> mpc_x_vals={predicted_state[0]};
+          vector<double> mpc_y_vals={predicted_state[1]};
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
+
+           for (int i = 2; i < vars.size(); i+=2) {
+             mpc_x_vals.push_back(vars[i]);
+             mpc_y_vals.push_back(vars[i+1]);
+          }
 
           msgJson["mpc_x"] = mpc_x_vals;
           msgJson["mpc_y"] = mpc_y_vals;
@@ -123,7 +176,13 @@ int main() {
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
-
+          double poly_inc = 2.5;
+          int num_points = 25;
+          
+          for (int i = 1; i < num_points; i++) {
+            next_x_vals.push_back(poly_inc * i);
+            next_y_vals.push_back(polyeval(coeffs, poly_inc * i));
+          }
           msgJson["next_x"] = next_x_vals;
           msgJson["next_y"] = next_y_vals;
 
