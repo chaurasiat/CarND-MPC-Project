@@ -3,6 +3,61 @@ Self-Driving Car Engineer Nanodegree Program
 
 ---
 
+## Reflection:
+The model: 
+MPC model takes in the following information from the simulator:
+ptsx:the x-position of waypoints ahead on the track in global coordinates
+ptsy:the y-position of waypoints ahead on the track in global coordinates
+px:current x-position of the vehicle in global coordinates
+py:current y-position of the vehicle in global coordinates
+psi:current orientation of vehicle
+v:current velocity of vehicle
+steering angle:current steering angle
+throttle:current throttle
+## Polynomial Fitting and MPC Preprocessing 
+ The first step involves transforming the given waypoints fromn global coordinates system to vehicle coordinates system,this results in simplifications of equations used as px,py and psi all becomes zero in vehicle co ordinate system
+A 3rd degree polynomial is used to fit the transformed waypoints
+
+## Latency
+The model accounts for the 100ms between the actuator calculation by predicting the state of the vehicle at 100ms ahead of the current state using the motion model equations which is then  passed to the solve method.
+
+double latent_px = 0.0 + v * dt; 
+
+const double latent_py = 0.0; 
+
+double latent_psi = 0.0 + v * -steering_angle / Lf * dt;
+
+double latent_v = v + throttle * dt;
+
+double latent_cte = cte + v * sin(epsi) * dt;
+
+double latent_epsi = epsi + v * -steering_angle / Lf * dt;
+
+## N and dt:
+N is the number of timesteps in the horizon,dt is how much time elapses between actuations.Larger value of N is not suitable as the environment is dynamic also it would tak more time to optimize..After trial and error I started with N=25 and dt=0.05 and after various trial and error I choose N=10 and dt=0.1
+
+## Parameter Tuning
+
+Along with tuning the value of N and dt also giving sutaible weights to cte,epsi were to be done,its imp that the car should be on on track and also importance should be given to epsi.I gave more priority to cte and epsi over other factor,after various attempts the following worked fine foe me:
+
+fg[0] += 2500*CppAD::pow(vars[cte_start + t], 2); 
+
+fg[0] += 2500*CppAD::pow(vars[epsi_start + t], 2);
+
+fg[0] +=20 * CppAD::pow(vars[delta_start + t], 2); 
+
+fg[0] += 10 *CppAD::pow(vars[a_start + t], 2);
+
+fg[0] +=100 * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2); 
+
+fg[0] +=10 * CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
+
+
+
+
+
+
+
 ## Dependencies
 
 * cmake >= 3.5
